@@ -190,8 +190,15 @@ function Start-Backend {
         return
     }
 
-    Start-Process -FilePath "cmd.exe" -ArgumentList "/c node `"$serverScript`"" -WorkingDirectory $ServerDir `
-        -WindowStyle Minimized -PassThru | Out-Null
+    $nodePath = (Get-Command node -ErrorAction SilentlyContinue).Source
+    if (-not $nodePath) {
+        Write-Err "node executable not found in PATH"
+        return
+    }
+    $nodeDir = Split-Path $nodePath -Parent
+    Start-Process -FilePath "cmd.exe" `
+        -ArgumentList "/c set PATH=$nodeDir;%PATH% && node `"$serverScript`"" `
+        -WorkingDirectory $ServerDir -WindowStyle Minimized -PassThru | Out-Null
 
     $retries = 10
     while ($retries -gt 0) {
@@ -216,13 +223,20 @@ function Start-Frontend {
         return
     }
 
-    Start-Process -FilePath "cmd.exe" -ArgumentList "/c npx vite --port $FrontendPort" `
+    $npxPath = (Get-Command npx -ErrorAction SilentlyContinue).Source
+    if (-not $npxPath) {
+        Write-Err "npx executable not found in PATH"
+        return
+    }
+    $nodeDir = Split-Path $npxPath -Parent
+    Start-Process -FilePath "cmd.exe" `
+        -ArgumentList "/c set PATH=$nodeDir;%PATH% && npx vite --port $FrontendPort" `
         -WorkingDirectory $ProjectRoot -WindowStyle Minimized -PassThru | Out-Null
 
-    $retries = 15
+    $retries = 25
     $actualPort = $FrontendPort
     while ($retries -gt 0) {
-        Start-Sleep -Milliseconds 800
+        Start-Sleep -Seconds 1
         $conn = Get-NetTCPConnection -LocalPort $FrontendPort -ErrorAction SilentlyContinue
         if ($conn) { $actualPort = $FrontendPort; break }
         $conn2 = Get-NetTCPConnection -LocalPort ($FrontendPort + 1) -ErrorAction SilentlyContinue
