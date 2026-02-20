@@ -145,6 +145,14 @@ SUPER_ADMIN_EMAILS=admin@example.com
 # ---- Install dependencies ----
 function Install-Dependencies {
     Write-Step "Installing frontend dependencies (this may take a minute)..."
+
+    # Remove existing node_modules to ensure native binaries match this platform
+    $feModules = Join-Path $ProjectRoot "node_modules"
+    if (Test-Path $feModules) {
+        Write-Warn "Removing existing node_modules for clean install..."
+        Remove-Item $feModules -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
     Push-Location $ProjectRoot
     $prevEAP = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
@@ -160,6 +168,13 @@ function Install-Dependencies {
     Write-OK "Frontend dependencies installed"
 
     Write-Step "Installing server dependencies..."
+
+    $beModules = Join-Path $ServerDir "node_modules"
+    if (Test-Path $beModules) {
+        Write-Warn "Removing existing server node_modules for clean install..."
+        Remove-Item $beModules -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
     Push-Location $ServerDir
     $ErrorActionPreference = "Continue"
     & npm install 2>&1 | Out-Null
