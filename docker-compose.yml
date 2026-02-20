@@ -1,0 +1,51 @@
+# ============================================
+# Cricket Club Website - Docker Compose
+# Production-ready with NGINX reverse proxy
+# ============================================
+
+services:
+  # --- Backend API + Frontend ---
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cricket-club-app
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - SUPER_ADMIN_EMAILS=${SUPER_ADMIN_EMAILS}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://yourdomain.com,https://www.yourdomain.com}
+    expose:
+      - "3001"
+    networks:
+      - cricket-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # --- NGINX Reverse Proxy with SSL ---
+  nginx:
+    image: nginx:alpine
+    container_name: cricket-club-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro           # Mount SSL certs
+      - ./dist:/usr/share/nginx/html:ro          # Serve frontend static files
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - cricket-net
+
+networks:
+  cricket-net:
+    driver: bridge

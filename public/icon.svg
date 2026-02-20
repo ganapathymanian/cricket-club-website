@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="64" fill="#7f1d1d"/>
+  <g fill="white">
+    <!-- Cricket Ball -->
+    <circle cx="256" cy="200" r="80" fill="white"/>
+    <path d="M200 160 Q256 200 200 240" stroke="#7f1d1d" stroke-width="4" fill="none"/>
+    <path d="M312 160 Q256 200 312 240" stroke="#7f1d1d" stroke-width="4" fill="none"/>
+    <!-- Cricket Bat -->
+    <rect x="220" y="300" width="72" height="140" rx="8" fill="white"/>
+    <rect x="240" y="440" width="32" height="50" rx="4" fill="white"/>
+    <!-- ACC Text -->
+    <text x="256" y="380" text-anchor="middle" font-family="Arial Black, sans-serif" font-size="48" font-weight="bold" fill="#7f1d1d">ACC</text>
+  </g>
+</svg>

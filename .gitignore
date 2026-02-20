@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+server/node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment variables - NEVER commit these
+.env
+.env.local
+.env.production
+server/.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Capacitor native projects (contain build artifacts)
+android/
+ios/
+
+# Coverage
+coverage/
+
+# Secrets and keys
+*.pem
+*.key
+*.crt
