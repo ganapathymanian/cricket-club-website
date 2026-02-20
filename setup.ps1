@@ -146,53 +146,32 @@ SUPER_ADMIN_EMAILS=admin@example.com
 function Install-Dependencies {
     Write-Step "Installing frontend dependencies (this may take a minute)..."
     Push-Location $ProjectRoot
-    try {
-        $output = & npm install 2>&1
-        $exitCode = $LASTEXITCODE
-        foreach ($line in $output) {
-            $text = $line.ToString()
-            if ($text -match "added|up to date") {
-                Write-OK $text.Trim()
-            } elseif ($text -match "warn") {
-                Write-Warn $text.Trim()
-            }
-        }
-        if ($exitCode -ne 0) {
-            Write-Err "npm install failed with exit code $exitCode"
-            exit 1
-        }
-        Write-OK "Frontend dependencies installed"
-    }
-    catch {
-        Write-Err "Failed to install frontend dependencies: $_"
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & npm install 2>&1 | Out-Null
+    $feExit = $LASTEXITCODE
+    $ErrorActionPreference = $prevEAP
+    Pop-Location
+
+    if ($feExit -ne 0) {
+        Write-Err "npm install failed for frontend (exit code $feExit)"
         exit 1
     }
-    finally { Pop-Location }
+    Write-OK "Frontend dependencies installed"
 
     Write-Step "Installing server dependencies..."
     Push-Location $ServerDir
-    try {
-        $output = & npm install 2>&1
-        $exitCode = $LASTEXITCODE
-        foreach ($line in $output) {
-            $text = $line.ToString()
-            if ($text -match "added|up to date") {
-                Write-OK $text.Trim()
-            } elseif ($text -match "warn") {
-                Write-Warn $text.Trim()
-            }
-        }
-        if ($exitCode -ne 0) {
-            Write-Err "npm install failed with exit code $exitCode"
-            exit 1
-        }
-        Write-OK "Server dependencies installed"
-    }
-    catch {
-        Write-Err "Failed to install server dependencies: $_"
+    $ErrorActionPreference = "Continue"
+    & npm install 2>&1 | Out-Null
+    $beExit = $LASTEXITCODE
+    $ErrorActionPreference = $prevEAP
+    Pop-Location
+
+    if ($beExit -ne 0) {
+        Write-Err "npm install failed for server (exit code $beExit)"
         exit 1
     }
-    finally { Pop-Location }
+    Write-OK "Server dependencies installed"
 }
 
 # ---- Start backend server ----
