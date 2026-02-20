@@ -147,11 +147,19 @@ function Install-Dependencies {
     Write-Step "Installing frontend dependencies (this may take a minute)..."
     Push-Location $ProjectRoot
     try {
-        & npm install 2>&1 | ForEach-Object {
-            $line = $_.ToString()
-            if ($line -match "added|up to date|warn|error") {
-                Write-Host "    $line" -ForegroundColor DarkGray
+        $output = & npm install 2>&1
+        $exitCode = $LASTEXITCODE
+        foreach ($line in $output) {
+            $text = $line.ToString()
+            if ($text -match "added|up to date") {
+                Write-OK $text.Trim()
+            } elseif ($text -match "warn") {
+                Write-Warn $text.Trim()
             }
+        }
+        if ($exitCode -ne 0) {
+            Write-Err "npm install failed with exit code $exitCode"
+            exit 1
         }
         Write-OK "Frontend dependencies installed"
     }
@@ -164,11 +172,19 @@ function Install-Dependencies {
     Write-Step "Installing server dependencies..."
     Push-Location $ServerDir
     try {
-        & npm install 2>&1 | ForEach-Object {
-            $line = $_.ToString()
-            if ($line -match "added|up to date|warn|error") {
-                Write-Host "    $line" -ForegroundColor DarkGray
+        $output = & npm install 2>&1
+        $exitCode = $LASTEXITCODE
+        foreach ($line in $output) {
+            $text = $line.ToString()
+            if ($text -match "added|up to date") {
+                Write-OK $text.Trim()
+            } elseif ($text -match "warn") {
+                Write-Warn $text.Trim()
             }
+        }
+        if ($exitCode -ne 0) {
+            Write-Err "npm install failed with exit code $exitCode"
+            exit 1
         }
         Write-OK "Server dependencies installed"
     }
