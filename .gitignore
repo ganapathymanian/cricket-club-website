@@ -23,6 +23,7 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+frontend-startup.log
 
 # Capacitor native projects (contain build artifacts)
 android/

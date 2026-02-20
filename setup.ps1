@@ -223,17 +223,30 @@ function Start-Frontend {
         return
     }
 
-    $npxPath = (Get-Command npx -ErrorAction SilentlyContinue).Source
-    if (-not $npxPath) {
-        Write-Err "npx executable not found in PATH"
+    # Verify node_modules exist
+    $viteScript = Join-Path $ProjectRoot (Join-Path "node_modules" (Join-Path "vite" (Join-Path "bin" "vite.js")))
+    if (-not (Test-Path $viteScript)) {
+        Write-Err "Vite not found at $viteScript"
+        Write-Err "Run setup.ps1 without -StartOnly first to install dependencies"
         return
     }
-    $nodeDir = Split-Path $npxPath -Parent
+
+    $nodePath = (Get-Command node -ErrorAction SilentlyContinue).Source
+    if (-not $nodePath) {
+        Write-Err "node executable not found in PATH"
+        return
+    }
+    $nodeDir = Split-Path $nodePath -Parent
+
+    # Log file so we can diagnose startup failures
+    $logFile = Join-Path $ProjectRoot "frontend-startup.log"
+
+    # Use node directly to run vite - most reliable across environments
     Start-Process -FilePath "cmd.exe" `
-        -ArgumentList "/c set PATH=$nodeDir;%PATH% && npx vite --port $FrontendPort" `
+        -ArgumentList "/c set PATH=$nodeDir;%PATH% && node `"$viteScript`" --port $FrontendPort > `"$logFile`" 2>&1" `
         -WorkingDirectory $ProjectRoot -WindowStyle Minimized -PassThru | Out-Null
 
-    $retries = 25
+    $retries = 30
     $actualPort = $FrontendPort
     while ($retries -gt 0) {
         Start-Sleep -Seconds 1
@@ -246,9 +259,15 @@ function Start-Frontend {
 
     if ($retries -gt 0) {
         Write-OK "Frontend running at http://localhost:$actualPort"
+        # Clean up log on success
+        Remove-Item $logFile -ErrorAction SilentlyContinue
     }
     else {
-        Write-Warn "Frontend may still be starting - check http://localhost:$FrontendPort"
+        Write-Warn "Frontend failed to start within 30 seconds"
+        if (Test-Path $logFile) {
+            Write-Warn "Startup log (last 15 lines):"
+            Get-Content $logFile -Tail 15 | ForEach-Object { Write-Host "    $_" -ForegroundColor Yellow }
+        }
     }
 }
 
