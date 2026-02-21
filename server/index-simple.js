@@ -115,6 +115,7 @@ const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // Super admin emails (managed via environment variable)
 const SUPER_ADMIN_EMAILS = (process.env.SUPER_ADMIN_EMAILS || '').split(',').filter(e => e.trim()).map(e => e.trim().toLowerCase());
+console.log(`🔑 Super admin emails loaded: [${SUPER_ADMIN_EMAILS.join(', ')}] (${SUPER_ADMIN_EMAILS.length} total)`);
 
 // In-memory data stores
 const users = new Map();
@@ -440,6 +441,8 @@ app.post('/api/auth/signup', rateLimit(AUTH_RATE_LIMIT_MAX), async (req, res) =>
         const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(lowerEmail);
         const role = isSuperAdmin ? 'admin' : 'member';
         
+        console.log(`🔍 Signup role check: email="${lowerEmail}", isSuperAdmin=${isSuperAdmin}, role="${role}", SUPER_ADMIN_EMAILS=[${SUPER_ADMIN_EMAILS.join(',')}]`);
+        
         // Create user
         const userId = `user-${Date.now()}`;
         const user = {
@@ -658,6 +661,21 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
             lastName: req.user.lastName,
             role: req.user.role
         }
+    });
+});
+
+// Diagnostic: check user role (helps debug admin issues)
+app.get('/api/auth/debug-role', (req, res) => {
+    const email = (req.query.email || '').toLowerCase().trim();
+    const user = users.get(email);
+    const isSuperAdminEmail = SUPER_ADMIN_EMAILS.includes(email);
+    res.json({
+        email,
+        userExists: !!user,
+        currentRole: user ? user.role : null,
+        isSuperAdminEmail,
+        superAdminEmails: SUPER_ADMIN_EMAILS,
+        totalUsers: users.size
     });
 });
 
