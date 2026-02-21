@@ -9,6 +9,7 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
+const fs = require('fs');
 const { OAuth2Client } = require('google-auth-library');
 
 const app = express();
@@ -125,7 +126,115 @@ const players = [];
 const results = [];
 const kvStore = new Map();
 const attendanceRecords = [];
+const liveMatches = new Map(); // matchId -> scoring state
 let youthTeams = ['Under 7', 'Under 9', 'Under 11', 'Under 13', 'Under 15', 'Under 17', 'Under 19'];
+
+// ============================================
+// File-Based Persistence (survives restarts)
+// ============================================
+const DATA_DIR = path.join(__dirname, 'data');
+const DATA_FILE = path.join(DATA_DIR, 'server-data.json');
+
+function saveData() {
+    try {
+        if (!fs.existsSync(DATA_DIR)) {
+            fs.mkdirSync(DATA_DIR, { recursive: true });
+        }
+        const snapshot = {
+            savedAt: new Date().toISOString(),
+            users: Array.from(users.entries()),
+            fixtures,
+            teams,
+            players,
+            results,
+            kvStore: Array.from(kvStore.entries()),
+            attendanceRecords,
+            youthTeams,
+            boardMembers,
+            bannerPhotos,
+            sponsors,
+            seasonConfig,
+            topPerformers,
+            liveMatches: Array.from(liveMatches.entries()),
+        };
+        // Write to temp file first, then rename (atomic write to prevent corruption)
+        const tempFile = DATA_FILE + '.tmp';
+        fs.writeFileSync(tempFile, JSON.stringify(snapshot, null, 2), 'utf8');
+        fs.renameSync(tempFile, DATA_FILE);
+    } catch (err) {
+        console.error('⚠️  Failed to save data to disk:', err.message);
+    }
+}
+
+function loadData() {
+    try {
+        if (!fs.existsSync(DATA_FILE)) {
+            console.log('📂 No saved data file found, will initialize with sample data.');
+            return false;
+        }
+        const raw = fs.readFileSync(DATA_FILE, 'utf8');
+        const snapshot = JSON.parse(raw);
+
+        // Restore users Map
+        users.clear();
+        if (snapshot.users && Array.isArray(snapshot.users)) {
+            for (const [key, value] of snapshot.users) {
+                users.set(key, value);
+            }
+        }
+
+        // Restore arrays (clear then push to keep same reference)
+        fixtures.length = 0;
+        if (snapshot.fixtures) fixtures.push(...snapshot.fixtures);
+
+        teams.length = 0;
+        if (snapshot.teams) teams.push(...snapshot.teams);
+
+        players.length = 0;
+        if (snapshot.players) players.push(...snapshot.players);
+
+        results.length = 0;
+        if (snapshot.results) results.push(...snapshot.results);
+
+        // Restore kvStore Map
+        kvStore.clear();
+        if (snapshot.kvStore && Array.isArray(snapshot.kvStore)) {
+            for (const [key, value] of snapshot.kvStore) {
+                kvStore.set(key, value);
+            }
+        }
+
+        attendanceRecords.length = 0;
+        if (snapshot.attendanceRecords) attendanceRecords.push(...snapshot.attendanceRecords);
+
+        if (snapshot.youthTeams) youthTeams = snapshot.youthTeams;
+
+        // Restore admin-configurable data
+        if (snapshot.boardMembers) boardMembers = snapshot.boardMembers;
+        if (snapshot.bannerPhotos) bannerPhotos = snapshot.bannerPhotos;
+        if (snapshot.sponsors) sponsors = snapshot.sponsors;
+        if (snapshot.seasonConfig) {
+            Object.assign(seasonConfig, snapshot.seasonConfig);
+        }
+        if (snapshot.topPerformers) topPerformers = snapshot.topPerformers;
+
+        // Restore live matches Map
+        if (snapshot.liveMatches && Array.isArray(snapshot.liveMatches)) {
+            liveMatches.clear();
+            for (const [key, value] of snapshot.liveMatches) {
+                liveMatches.set(key, value);
+            }
+        }
+
+        console.log(`✅ Loaded saved data from disk (saved at ${snapshot.savedAt})`);
+        console.log(`   📊 ${users.size} users, ${fixtures.length} fixtures, ${teams.length} teams, ${players.length} players, ${results.length} results`);
+        return true;
+    } catch (err) {
+        console.error('⚠️  Failed to load saved data:', err.message);
+        console.log('   Will initialize with sample data instead.');
+        return false;
+    }
+}
 
 // Board members data
 let boardMembers = {
@@ -315,6 +424,23 @@ app.use(express.json({ limit: '10mb' }));
 app.use((req, res, next) => {
     if (req.body && typeof req.body === 'object') {
         req.body = sanitizeInput(req.body);
+    }
+    next();
+});
+
+// Auto-save data to disk after any successful mutation (POST/PUT/DELETE)
+app.use((req, res, next) => {
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+        const originalJson = res.json.bind(res);
+        res.json = function(body) {
+            // Save after successful mutations (status 2xx and success:true)
+            if (res.statusCode >= 200 && res.statusCode < 300 && body && body.success !== false) {
+                // Debounce saves - wait 500ms to batch rapid mutations
+                if (global._saveTimer) clearTimeout(global._saveTimer);
+                global._saveTimer = setTimeout(() => saveData(), 500);
+            }
+            return originalJson(body);
+        };
     }
     next();
 });
@@ -1643,7 +1769,6 @@ app.get('/api/admin/completed-live-matches', authenticateToken, (req, res) => {
 // ============================================
 // Live Scoring Routes
 // ============================================
-const liveMatches = new Map(); // matchId -> scoring state
 
 // Get all active live scoring sessions
 app.get('/api/live-scoring', authenticateToken, (req, res) => {
@@ -2078,7 +2203,11 @@ app.post('/api/live-scoring/:matchId/undo', authenticateToken, (req, res) => {
 // ============================================
 // Start Server
 // ============================================
-initializeSampleData();
+// Load persisted data from disk, or initialize with sample data if no save file exists
+if (!loadData()) {
+    initializeSampleData();
+    saveData(); // Save the initial sample data so it persists
+}
 
 // In production, serve the built frontend from ../dist
 if (process.env.NODE_ENV === 'production') {
@@ -2102,8 +2231,8 @@ app.listen(PORT, '0.0.0.0', () => {
 ║   Server running on: http://0.0.0.0:${PORT}                    ║
 ║   API Base URL:      http://localhost:${PORT}/api               ║
 ║                                                                ║
-║   Mode: IN-MEMORY (No database required)                       ║
-║   Note: Data will be lost when server restarts                 ║
+║   Mode: IN-MEMORY with FILE PERSISTENCE                       ║
+║   Data saved to: server/data/server-data.json                  ║
 ║                                                                ║
 ╚════════════════════════════════════════════════════════════════╝
     `);

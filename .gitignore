@@ -36,3 +36,6 @@ coverage/
 *.pem
 *.key
 *.crt
+
+# Server persisted data (user accounts, settings - unique per deployment)
+server/data/
