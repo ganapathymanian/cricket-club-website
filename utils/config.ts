@@ -9,9 +9,9 @@ const getApiUrl = () => {
     if (import.meta.env.VITE_API_URL) {
         return import.meta.env.VITE_API_URL;
     }
-    // Auto-detect: use the same hostname the browser is on, with backend port 3001
-    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-    return `http://${hostname}:3001/api`;
+    // Use relative URL - Vite proxy forwards /api to backend on port 3001
+    // This means only the frontend port (e.g. 80) needs to be open externally
+    return '/api';
 };
 
 const CONFIG = {
