@@ -4,8 +4,18 @@
 // ============================================
 // Backend Configuration
 // ============================================
+const getApiUrl = () => {
+    // If explicitly set via env var, use that
+    if (import.meta.env.VITE_API_URL) {
+        return import.meta.env.VITE_API_URL;
+    }
+    // Auto-detect: use the same hostname the browser is on, with backend port 3001
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+    return `http://${hostname}:3001/api`;
+};
+
 const CONFIG = {
-    apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
+    apiUrl: getApiUrl(),
     authMode: 'jwt' as const,
     // Google OAuth Configuration
     googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',

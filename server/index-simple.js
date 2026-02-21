@@ -292,6 +292,10 @@ app.use(cors({
         if (origin && origin.match(/^https?:\/\/localhost(:\d+)?$/)) {
             return callback(null, true);
         }
+        // Allow any IP-based origin (for Azure VM / remote access)
+        if (origin && origin.match(/^https?:\/\/[\d.]+(:\d+)?$/)) {
+            return callback(null, true);
+        }
         if (origin && origin.startsWith('capacitor://')) {
             return callback(null, true);
         }
@@ -2032,13 +2036,13 @@ if (process.env.NODE_ENV === 'production') {
     console.log(`📁 Serving static frontend from: ${distPath}`);
 }
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`
 ╔════════════════════════════════════════════════════════════════╗
 ║                                                                ║
 ║   🏏 Cricket Club Website - In-Memory Server                   ║
 ║                                                                ║
-║   Server running on: http://localhost:${PORT}                   ║
+║   Server running on: http://0.0.0.0:${PORT}                    ║
 ║   API Base URL:      http://localhost:${PORT}/api               ║
 ║                                                                ║
 ║   Mode: IN-MEMORY (No database required)                       ║
