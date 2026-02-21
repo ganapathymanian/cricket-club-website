@@ -1055,6 +1055,45 @@ app.get('/api/admin/members', authenticateToken, requireAdmin, (req, res) => {
     res.json({ success: true, members: userList });
 });
 
+// Update user role - requires admin role
+app.put('/api/users/:userId/role', authenticateToken, requireAdmin, (req, res) => {
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    const validRoles = ['admin', 'member', 'fixture_secretary', 'coach', 'head_coach', 'accountant'];
+    if (!role || !validRoles.includes(role)) {
+        return res.status(400).json({ success: false, error: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
+    }
+
+    // Find user by id
+    let targetUser = null;
+    for (const u of users.values()) {
+        if (u.id === userId) {
+            targetUser = u;
+            break;
+        }
+    }
+
+    if (!targetUser) {
+        return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const oldRole = targetUser.role;
+    targetUser.role = role;
+    console.log(`[ROLE UPDATE] User ${targetUser.email} role changed from "${oldRole}" to "${role}" by admin ${req.user.email}`);
+
+    res.json({
+        success: true,
+        user: {
+            id: targetUser.id,
+            userId: targetUser.id,
+            email: targetUser.email,
+            name: targetUser.name,
+            role: targetUser.role
+        }
+    });
+});
+
 // Grant admin rights - requires admin role
 app.post('/api/admin/grant-admin-rights', authenticateToken, requireAdmin, (req, res) => {
     const { email } = req.body;
