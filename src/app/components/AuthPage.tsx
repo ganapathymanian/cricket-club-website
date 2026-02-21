@@ -218,6 +218,7 @@ export function AuthPage({ apiUrl, apiKey, onLoginSuccess }: AuthPageProps) {
         toast.error("Cannot reach the server. Please check if the backend is running.");
       } else {
         toast.error(`Failed to login: ${error?.message || 'Unknown error'}`);
+      }
     } finally {
       setLoading(false);
     }
