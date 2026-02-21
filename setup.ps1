@@ -101,7 +101,8 @@ function Ensure-Node {
 function Stop-Servers {
     Write-Step "Stopping any running servers..."
 
-    foreach ($port in @($FrontendPort, ($FrontendPort + 1), $BackendPort)) {
+    $portsToCheck = @($FrontendPort, ($FrontendPort + 1), $BackendPort, 5173, 5174, 80) | Select-Object -Unique
+    foreach ($port in $portsToCheck) {
         $procs = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue |
                  Select-Object -ExpandProperty OwningProcess -Unique
         foreach ($procId in $procs) {
@@ -270,7 +271,7 @@ function Start-Frontend {
 
     # Use node directly to run vite - most reliable across environments
     Start-Process -FilePath "cmd.exe" `
-        -ArgumentList "/c set PATH=$nodeDir;%PATH% && node `"$viteScript`" --port $FrontendPort > `"$logFile`" 2>&1" `
+        -ArgumentList "/c set PATH=$nodeDir;%PATH% && node `"$viteScript`" --host 0.0.0.0 --port $FrontendPort > `"$logFile`" 2>&1" `
         -WorkingDirectory $ProjectRoot -WindowStyle Minimized -PassThru | Out-Null
 
     $retries = 30
