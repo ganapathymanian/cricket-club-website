@@ -77,10 +77,16 @@ export function AuthPage({ apiUrl, apiKey, onLoginSuccess }: AuthPageProps) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({ email: formData.email }),
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Email check failed:", response.status, errorText);
+        toast.error(`Server error (${response.status}). Is the backend running?`);
+        return;
+      }
 
       const data = await response.json();
 
@@ -95,9 +101,14 @@ export function AuthPage({ apiUrl, apiKey, onLoginSuccess }: AuthPageProps) {
         setAuthStep("signup");
         toast.info("New user detected! Please complete your profile.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Email check error:", error);
-      toast.error("Failed to verify email. Please try again.");
+      // Show specific error - helps diagnose network/proxy issues
+      if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+        toast.error("Cannot reach the server. Please check if the backend is running.");
+      } else {
+        toast.error(`Failed to verify email: ${error?.message || 'Unknown error'}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -117,7 +128,6 @@ export function AuthPage({ apiUrl, apiKey, onLoginSuccess }: AuthPageProps) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({ 
           credential: credentialResponse.credential 
@@ -180,13 +190,19 @@ export function AuthPage({ apiUrl, apiKey, onLoginSuccess }: AuthPageProps) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
         }),
       });
+
+      if (!response.ok && response.status >= 500) {
+        const errorText = await response.text();
+        console.error("Login server error:", response.status, errorText);
+        toast.error(`Server error (${response.status}). Is the backend running?`);
+        return;
+      }
 
       const data = await response.json();
 
@@ -196,9 +212,12 @@ export function AuthPage({ apiUrl, apiKey, onLoginSuccess }: AuthPageProps) {
       } else {
         toast.error(data.error || "Invalid email or password");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login error:", error);
-      toast.error("Failed to login. Please try again.");
+      if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+        toast.error("Cannot reach the server. Please check if the backend is running.");
+      } else {
+        toast.error(`Failed to login: ${error?.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -297,13 +316,19 @@ export function AuthPage({ apiUrl, apiKey, onLoginSuccess }: AuthPageProps) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(requestBody),
       });
 
       console.log("Signup response status:", response.status);
       console.log("Signup response ok:", response.ok);
+
+      if (!response.ok && response.status >= 500) {
+        const errorText = await response.text();
+        console.error("Signup server error:", response.status, errorText);
+        toast.error(`Server error (${response.status}). Is the backend running?`);
+        return;
+      }
       
       const data = await response.json();
       console.log("Signup response:", { success: data.success, hasAccessToken: !!data.accessToken, error: data.error });
