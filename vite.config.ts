@@ -86,6 +86,8 @@ export default defineConfig({
 
   // Proxy /api requests to backend server (avoids need to open port 3001 externally)
   server: {
+    host: '0.0.0.0',
+    strictPort: true,
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

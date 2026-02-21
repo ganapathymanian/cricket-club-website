@@ -101,14 +101,34 @@ function Ensure-Node {
 function Stop-Servers {
     Write-Step "Stopping any running servers..."
 
+    # Stop IIS / W3SVC if it is holding port 80
+    if ($FrontendPort -eq 80) {
+        $w3svc = Get-Service -Name "W3SVC" -ErrorAction SilentlyContinue
+        if ($w3svc -and $w3svc.Status -eq "Running") {
+            Write-Warn "IIS (W3SVC) is running and may hold port 80 - stopping it..."
+            try {
+                Stop-Service -Name "W3SVC" -Force -ErrorAction Stop
+                Write-OK "IIS stopped"
+            } catch {
+                Write-Err "Could not stop IIS. Run as Administrator or stop it manually."
+            }
+        }
+        # Also stop HTTP.sys service which can hold port 80
+        $httpSvc = Get-Service -Name "HTTP" -ErrorAction SilentlyContinue
+        if ($httpSvc -and $httpSvc.Status -eq "Running") {
+            Write-Warn "HTTP.sys service is running - checking if port 80 is reserved..."
+        }
+    }
+
     $portsToCheck = @($FrontendPort, ($FrontendPort + 1), $BackendPort, 5173, 5174, 80) | Select-Object -Unique
     foreach ($port in $portsToCheck) {
         $procs = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue |
                  Select-Object -ExpandProperty OwningProcess -Unique
         foreach ($procId in $procs) {
             try {
+                $procName = (Get-Process -Id $procId -ErrorAction SilentlyContinue).ProcessName
                 Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
-                Write-OK "Stopped process $procId on port $port"
+                Write-OK "Stopped $procName (PID $procId) on port $port"
             } catch {}
         }
     }
@@ -303,6 +323,9 @@ function Start-Frontend {
 
     if ($retries -gt 0) {
         Write-OK "Frontend running at http://localhost:$actualPort"
+        if ($actualPort -ne $FrontendPort) {
+            Write-Warn "Vite started on port $actualPort instead of $FrontendPort (port $FrontendPort may be in use)"
+        }
         # Clean up log on success
         Remove-Item $logFile -ErrorAction SilentlyContinue
     }
