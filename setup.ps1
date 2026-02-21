@@ -18,10 +18,14 @@
 .PARAMETER Backup
     Create a timestamped backup of the project.
 
+.PARAMETER Port
+    Custom frontend port (default: 5173). Use -Port 80 for production.
+
 .EXAMPLE
     .\setup.ps1                  # Full setup: install + start
     .\setup.ps1 -InstallOnly     # Install dependencies only
     .\setup.ps1 -StartOnly       # Start servers only
+    .\setup.ps1 -Port 80         # Start on port 80 (run as Admin)
     .\setup.ps1 -StopAll         # Stop all running servers
     .\setup.ps1 -Backup          # Create a backup
 #>
@@ -30,7 +34,8 @@ param(
     [switch]$InstallOnly,
     [switch]$StartOnly,
     [switch]$StopAll,
-    [switch]$Backup
+    [switch]$Backup,
+    [int]$Port = 5173
 )
 
 $ErrorActionPreference = "Stop"
@@ -39,7 +44,7 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot   = $PSScriptRoot
 $ServerDir     = Join-Path $ProjectRoot "server"
 $BackupBase    = Join-Path (Split-Path $ProjectRoot -Parent) "Backups"
-$FrontendPort  = 5173
+$FrontendPort  = $Port
 $BackendPort   = 3001
 
 # ---- Helpers ----
@@ -116,6 +121,13 @@ function Ensure-Env {
 
     if (Test-Path $envFile) {
         Write-OK ".env file exists"
+        # Ensure ALLOWED_ORIGINS includes the current frontend port
+        $envContent = Get-Content $envFile -Raw
+        if ($envContent -match "ALLOWED_ORIGINS=" -and $envContent -notmatch "localhost:$FrontendPort") {
+            $envContent = $envContent -replace "(ALLOWED_ORIGINS=.*)", "`$1,http://localhost:$FrontendPort"
+            Set-Content -Path $envFile -Value $envContent -Encoding UTF8 -NoNewline
+            Write-OK "Added http://localhost:$FrontendPort to ALLOWED_ORIGINS"
+        }
     }
     else {
         Write-Warn ".env not found - creating with defaults..."
