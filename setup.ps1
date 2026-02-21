@@ -251,6 +251,22 @@ function Start-Frontend {
         return
     }
 
+    # Ensure Windows Firewall allows the frontend port
+    $ruleName = "CricketClub-Frontend-Port-$FrontendPort"
+    $existingRule = Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue
+    if (-not $existingRule) {
+        try {
+            New-NetFirewallRule -DisplayName $ruleName `
+                -Direction Inbound -Protocol TCP -LocalPort $FrontendPort `
+                -Action Allow -Profile Any -ErrorAction Stop | Out-Null
+            Write-OK "Firewall rule added for port $FrontendPort"
+        } catch {
+            Write-Warn "Could not add firewall rule (need Admin). Run as Administrator or manually allow port $FrontendPort"
+        }
+    } else {
+        Write-OK "Firewall rule already exists for port $FrontendPort"
+    }
+
     # Verify node_modules exist
     $viteScript = Join-Path $ProjectRoot (Join-Path "node_modules" (Join-Path "vite" (Join-Path "bin" "vite.js")))
     if (-not (Test-Path $viteScript)) {
@@ -369,6 +385,20 @@ function Show-Status {
 
     if ($fePort) {
         Write-Host "  [RUNNING] Frontend: http://localhost:$fePort" -ForegroundColor Green
+        # Show external IP for remote access
+        try {
+            $externalIP = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias "Ethernet*" -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -ne '127.0.0.1' } | Select-Object -First 1).IPAddress
+            if (-not $externalIP) {
+                $externalIP = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -ne '127.0.0.1' -and $_.IPAddress -notlike '169.*' } | Select-Object -First 1).IPAddress
+            }
+            if ($externalIP) {
+                if ($fePort -eq 80) {
+                    Write-Host "  [REMOTE]  External: http://$externalIP" -ForegroundColor Green
+                } else {
+                    Write-Host "  [REMOTE]  External: http://${externalIP}:$fePort" -ForegroundColor Green
+                }
+            }
+        } catch {}
     } else {
         Write-Host "  [STOPPED] Frontend: not running" -ForegroundColor Red
     }
